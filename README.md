@@ -41,7 +41,7 @@ Create a directory on your RPi and clone this repository into it
 	
 #### Misc
 - An account and an AppId from [open weather map](openweathermap.org)
-	-  the account is free and is required to obtain the weather information, you will ALSO need to register for the free 1000 daily API calls (make sure to limit it to 1000 calls, after that there is a charge)
+	-  the account is free and is required to obtain the weather information, you will ALSO need to register for the free 1000 daily API calls (make sure to limit it to 1000 calls, after that there is a charge) though i have never used more than 200 even when testing.
 - [the latest Raspberry Pi OS image](www.raspberrypi.org/software/operating-systems)
 	- downloading and installation directions are on the website
 #### LED

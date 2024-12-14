@@ -16,7 +16,7 @@ This project was written in python3 on a Raspberry Pi 3B+, however almost any RP
 
 ![Figure 1!](/images/figure1.png)
 
-![Figure 2!](/images/PXL_20241213_071511521.LS.mp4)
+[Video](https://imgur.com/a/Tb6DDtc)
 
 The left hand side shows today's temperature and forcast, the right hand side cycles through the week showing the high/low temperatures with forcast, and the weather icon for each day. Below that is the wind speed and direction, and below that is a scrolling text that shows today's weather alerts, if there are any.
 

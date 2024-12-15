@@ -99,7 +99,7 @@ class panelApp(SampleBase):
     def __init__(self, *args, **kwargs):
         super(panelApp, self).__init__(*args, **kwargs)
         self.rssApp = rss()
-        self.iconSize = 32
+        self.iconSize = 64
 
     """
     get the curent weather data, if it is unavailable then just use what we have
@@ -126,7 +126,9 @@ class panelApp(SampleBase):
     """
 
     def parseData(self, data):
-        current = data["current"]
+        # Extract current weather data
+        current = data["current"] 
+        # Extract sunrise, sunset, temperature, cloudiness, and wind data
         self.sunrise = current["sunrise"]
         self.sunset = current["sunset"]
         self.temperatureNow = current["temp"]
@@ -134,27 +136,43 @@ class panelApp(SampleBase):
         self.windSpeed = current["wind_speed"]
         self.windDir = self.degToCompass(int(current["wind_deg"]))
         self.humidity = current["humidity"]
-        # there may not be any alerts currently
-        try:
+
+        # Access the first item in the 'weather' array
+        weather_info = current["weather"][0]
+    
+        # Extract the main weather condition (e.g., 'Clear', 'Clouds')
+        self.weatherMain = weather_info["main"]  # This will be something like 'Clear', 'Clouds', etc.
+    
+        # Handling possible weather alerts
+        alerts = []
+        if "alerts" in data:  # Safely check if alerts exist in the data
             alerts = data["alerts"]
-        except:
-            alerts = []
+
+        # Extract weather icon ID and load the associated icon
         iconId = current["weather"][0]["icon"]
         self.loadAndSaveIcon(iconId)
         filename = "./icons/" + iconId + ".png"
         self.weatherIcon = Image.open(filename)
-        # this will delete any 'old' alerts on every call
+  
+        # Delete old alerts on every call
         for alert in alerts:
-            description = alert["description"].replace("\n", " ")
-            if not description in self.alertArray:
-                self.alertArray.append(description)
-            else:
-                self.alertArray.remove(description)
+            # Ensure the description is available before using it
+            if "description" in alert:
+                description = alert["description"].replace("\n", " ")
+                if description not in self.alertArray:
+                    self.alertArray.append(description)
+                else:
+                    self.alertArray.remove(description)
 
+        # Extract daily forecast data (min/max temperature and main weather)
         self.daily = data["daily"]
         temperatures = self.daily[0]["temp"]
         self.minTemp = temperatures["min"]
         self.maxTemp = temperatures["max"]
+        # Get the main weather information for the first day
+        main_weather = self.daily[0]["weather"][0]  # The 'weather' array contains information about the weather conditions
+        self.weatherDescription = main_weather["description"]  # E.g., "clear sky"
+        self.dailyWeatherMain = main_weather["main"]  # E.g., "Clear", "Rain", etc.
 
     def degToCompass(self, num):
         val = int((num / 22.5) + 0.5)
@@ -272,18 +290,19 @@ class panelApp(SampleBase):
             if not self.weatherIcon == None:
                 # increment the dayIndex every minute
                 if loopCounter % tensec == 0:
-                    dayIndex = (dayIndex + 1) % 7
+                    dayIndex = (dayIndex + 1) % 8
                     if dayIndex == 0:
                         dayName = "Today"
                     else:
                         dayName = time.strftime(
-                            "%a", time.localtime(self.daily[dayIndex]["dt"])
+                            "%A", time.localtime(self.daily[dayIndex]["dt"])
                         )
                     temperatures = self.daily[dayIndex]["temp"]
                     minTemp = temperatures["min"]
                     maxTemp = temperatures["max"]
                     iconId = self.daily[dayIndex]["weather"][0]["icon"]
                     weatherIcon = self.loadAndSaveIcon(iconId)
+                    self.dailyWeatherMain = self.daily[dayIndex]["weather"][0]["main"]
 
             # draw the date
             graphics.DrawText(
@@ -291,16 +310,16 @@ class panelApp(SampleBase):
                 self.font,
                 12,
                 lineHeight,
-                graphics.Color(255, 215, 0),
+                graphics.Color(51, 153, 255),
                 dateNow,
             )
             # draw the time
             graphics.DrawText(
                 self.offscreen_canvas,
                 self.fontB,
-                42,
+                46,
                 2 * lineHeight + 1,
-                graphics.Color(218, 32, 32),
+                graphics.Color(0, 215, 100),
                 timeNow,
             )
             # draw the alert text or the RSS feed if there are no alerts
@@ -323,16 +342,15 @@ class panelApp(SampleBase):
                         self.fontMed,
                         self.xpos,
                         ypos,
-                        graphics.Color(255, 20, 20),
+                        graphics.Color(0, 128, 100),
                         self.rssApp.posts_to_print[rssNo],
                     )
 
             # draw the weather info iffi the http request has completed
-            #
             if not self.weatherIcon == None:
                 self.offscreen_canvas.SetImage(
                     weatherIcon.convert("RGB"),
-                    42,
+                    48,
                     2 * lineHeight + self.lineSpacing + 1,
                 )
 
@@ -340,36 +358,110 @@ class panelApp(SampleBase):
                 graphics.DrawText(
                     self.offscreen_canvas,
                     self.fontSmall,
-                    2,
+                    3,
                     2 * lineHeight + self.lineSpacing,
                     graphics.Color(255, 255, 255),
-                    "Now:",
+                    "Current:",
                 )
+                def get_temperature_color(temp, min_temp, max_temp):
+                # Map the temperature to a color in the range -20°F to 120°F, with yellow in the middle.
+    
+                    if temp <= -20:
+                        return graphics.Color(0, 0, 255)  # Blue for cold
+                    elif temp >= 120:
+                        return graphics.Color(255, 0, 0)  # Red for hot
+                    elif temp <= 70:
+                        # From -20°F to 60°F, color transitions from blue to green
+                        normalized_temp = (temp + 20) / 90  # Normalize between 0 and 1 for -20°F to 60°F
+                        red = 0
+                        green = int(255 * normalized_temp)
+                        blue = int(255 * (1 - normalized_temp))
+                        return graphics.Color(red, green, blue)
+                    else:
+                        # From 70°F to 120°F, color transitions from green to red
+                        normalized_temp = (temp - 70) / 50  # Normalize between 0 and 1 for 60°F to 120°F
+                        red = int(255 * normalized_temp)
+                        green = int(255 * (1 - normalized_temp))
+                        blue = 0
+                        return graphics.Color(red, green, blue)
 
-                # draw the current temperature
+                # For the current temperature:
+                current_color = get_temperature_color(self.temperatureNow, minTemp, maxTemp)
                 graphics.DrawText(
                     self.offscreen_canvas,
                     self.fontMed,
-                    2,
+                    3,
                     3 * lineHeight + self.lineSpacing,
-                    graphics.Color(0, 255, 0),
+                    current_color,
                     str(int(self.temperatureNow)) + u"\u00b0" + "F",
                 )
-                # draw the hunidity
+
+                # For the minimum temperature:
+                min_temp_color = get_temperature_color(minTemp, minTemp, maxTemp)
+                graphics.DrawText(
+                    self.offscreen_canvas,
+                    self.fontMed,
+                    50 + 36,
+                    3 * lineHeight + self.lineSpacing,
+                    min_temp_color,
+                    str(int(minTemp)),
+                )
+                # Draw the "/" symbol in a fixed color (e.g., black or white)
+                graphics.DrawText(
+                    self.offscreen_canvas,
+                    self.fontMed,
+                    50 + 35 + len(str(int(minTemp))) * self.fontMed.CharacterWidth(0),  # Adjust position after the min temperature
+                    3 * lineHeight + self.lineSpacing,
+                    graphics.Color(255, 255, 255),  # White color for the "/"
+                    "/",
+                )
+
+                # For the maximum temperature:
+                max_temp_color = get_temperature_color(maxTemp, minTemp, maxTemp)
+                graphics.DrawText(
+                    self.offscreen_canvas,
+                    self.fontMed,
+                    50 + 53,
+                    3 * lineHeight + self.lineSpacing,
+                    max_temp_color,
+                    str(int(maxTemp)),
+                )
+                
+                # Draw the unit symbol "°F" for the max temperature in a fixed color (e.g., black or white)
+                graphics.DrawText(
+                    self.offscreen_canvas,
+                    self.fontMed,
+                    50 + 59 + len(str(int(minTemp))) * self.fontMed.CharacterWidth(10) + 10 + len(str(int(maxTemp))) * self.fontMed.CharacterWidth(10),  # Adjust position after max temperature
+                    3 * lineHeight + self.lineSpacing,
+                    graphics.Color(255, 255, 255),  # White color for the degree symbol and "F"
+                    u"\u00b0" + "F",  # Degree symbol and "F"
+                )
+                
+                # draw the daily weather outlook
+                graphics.DrawText(
+                    self.offscreen_canvas,
+                    self.fontMed,
+                    50 + 36,
+                    4 * lineHeight + self.lineSpacing,
+                    graphics.Color(0, 128, 255),
+                    str(self.dailyWeatherMain),
+                )
+                
+                # draw the current condition
                 graphics.DrawText(
                     self.offscreen_canvas,
                     self.fontMed,
                     2,
                     4 * lineHeight + self.lineSpacing,
                     graphics.Color(0, 128, 255),
-                    str(int(self.humidity)) + "%",
+                    str(self.weatherMain),
                 )
                 # draw the wind speed and direction
                 graphics.DrawText(
                     self.offscreen_canvas,
                     self.fontMed,
-                    12,
-                    5 * lineHeight + 2,
+                    15,
+                    5 * lineHeight + 3,
                     graphics.Color(0, 255, 255),
                     str(int(self.windSpeed)) + "mph from the " + self.windDir,
                 )
@@ -378,20 +470,10 @@ class panelApp(SampleBase):
                 graphics.DrawText(
                     self.offscreen_canvas,
                     self.fontSmall,
-                    50 + 46,
+                    50 + 36,
                     2 * lineHeight + self.lineSpacing,
                     graphics.Color(255, 255, 255),
                     dayName + ":",
-                )
-
-                # draw the min/max temperatures
-                graphics.DrawText(
-                    self.offscreen_canvas,
-                    self.fontMed,
-                    50 + 36,
-                    3 * lineHeight + self.lineSpacing,
-                    graphics.Color(0, 255, 128),
-                    str(int(minTemp)) + "/" + str(int(maxTemp)) + u"\u00b0" + "F",
                 )
 
             # move the scroll text 1 pixel
@@ -438,7 +520,7 @@ class panelApp(SampleBase):
                         if rssNo >= len(self.rssApp.posts_to_print):
                             rssNo = 0
 
-            time.sleep(0.075)
+            time.sleep(0.04)
             self.offscreen_canvas = self.matrix.SwapOnVSync(self.offscreen_canvas)
             loopCounter = loopCounter + 1
 
@@ -478,13 +560,19 @@ class panelApp(SampleBase):
             options.cols = int(ledOptions.get("cols", 64))
             options.rows = int(ledOptions.get("rows", 32))
             options.chain_length = int(ledOptions.get("chain_length", 4))
+            options.brightness = int(ledOptions.get("brightness", 100))
+            options.gpio_slowdown = int(ledOptions.get("gpio_slowdown", 1))
+            options.pwm_bits = int(ledOptions.get("pwm_bits", 11))
+            options.pwm_dither_bits = int(ledOptions.get("pwm_dither_bits", 0))
+            options.pwm_lsb_nanoseconds = int(ledOptions.get("pwm_lsb_nanoseconds", 130))
             options.parallel = int(ledOptions.get("parallel", 1))
+            options.show_refresh_rate = bool(ledOptions.get("True", True))
             options.hardware_mapping = ledOptions.get(
-                "hardware_mapping", "adafruit-hat"
+                "hardware_mapping", "adafruit-hat-pwm"
             )
-            options.pixel_mapper_config = ledOptions.get(
-                "pixel_mapper_config", "U-mapper"
-            )
+#            options.pixel_mapper_config = ledOptions.get(
+#                "pixel_mapper_config", "U-mapper"
+#            )
             self.matrix = RGBMatrix(options=options)
         else:
             self.handleOptionsError("LED", "")
@@ -510,7 +598,7 @@ class panelApp(SampleBase):
                 self.handleOptionsError("WEATHER", "appid")
         else:
             self.handleOptionsError("WEATHER", "")
-        self.weatherUri = "https://api.openweathermap.org/data/2.5/onecall"
+        self.weatherUri = "https://api.openweathermap.org/data/3.0/onecall"
         self.params = (
             "lat=" + lat + "&lon=" + lon + "&appid=" + appid + "&units=" + units
         )
